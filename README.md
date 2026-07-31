@@ -3,9 +3,9 @@
 
 ## C
 
-### Implementation of the **Filter (More)** problem from Harvard's CS50x.
+### Implementation of the **Filter (More)** and **Recover** problem from Harvard's CS50x.
 
-### Description
+## Filter
 
 This project applies different image filters to 24-bit BMP images using C.
 
@@ -15,8 +15,6 @@ The program supports four filters:
 * **Reflect (`-r`)** – Reflects the image horizontally.
 * **Blur (`-b`)** – Applies a box blur to each pixel.
 * **Edges (`-e`)** – Detects edges using the Sobel operator.
-
-### Example
 
 ```bash
 ./filter -g images/yard.bmp output.bmp
@@ -30,9 +28,7 @@ Other filters:
 ./filter -e images/yard.bmp output.bmp
 ```
 
-## Filters
-
-### Grayscale
+- Grayscale
 
 Each pixel's red, green, and blue values are averaged:
 
@@ -42,17 +38,17 @@ average = (red + green + blue) / 3
 
 The resulting average is assigned to all three color channels.
 
-### Reflect
+- Reflect
 
 Pixels on each row are swapped from left to right, producing a horizontal mirror effect.
 
-### Blur
+- Blur
 
 Each pixel is replaced with the average color of itself and its neighboring pixels.
 
 A copy of the original image is used so that modifying one pixel does not affect the calculations for other pixels.
 
-### Edges
+- Edges
 
 The edge detection filter uses the **Sobel operator** with horizontal (`Gx`) and vertical (`Gy`) kernels to detect changes in pixel intensity.
 
@@ -64,6 +60,27 @@ sqrt(Gx² + Gy²)
 
 and capped at `255`.
 
+## Recover
+
+Recover is a C program that recovers JPEG images from a forensic image file containing raw data from a memory card.
+
+The program reads the memory card data in blocks of 512 bytes, identifies JPEG file signatures, and writes each recovered JPEG to a separate file.
+
+
+Run it with the forensic image:
+
+```bash
+./recover card.raw
+```
+
+The program generates recovered images with names such as:
+
+```text
+000.jpg
+001.jpg
+002.jpg
+...
+```
 
 https://cs50.harvard.edu/x/
 
