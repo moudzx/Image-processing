@@ -1,5 +1,25 @@
 # Image-processing
+
+Raw image recovery and 24-bit BMP images filter library in C & Python-matplotlib based digital image processing toolkit.
+
+## Python
+
+### Digital Image Processing (CS/ECE 454) Workshop by Prof. Emmanuel Agu
+
 <img width="1080" height="1080" alt="photo_2026-06-22_07-55-42" src="https://github.com/user-attachments/assets/436a5ecf-f4f9-4351-b5e9-ed803cb27998" />
+
+
+### Description
+Python-matplotlib based digital image processing toolkit, based on : 
+
+- Spatial filtering
+- Edge detection
+- Histogram analysis
+- Intensity windowing
+- Thresholding
+- Pixel-level transformations.
+
+
 
 ## C
 
@@ -62,6 +82,9 @@ and capped at `255`.
 
 ## Recover
 
+<img width="800" height="599" alt="recovered_image" src="https://github.com/user-attachments/assets/bb057e1f-df25-4deb-a72c-61546f5b9c4e" />
+
+
 Recover is a C program that recovers JPEG images from a forensic image file containing raw data from a memory card.
 
 The program reads the memory card data in blocks of 512 bytes, identifies JPEG file signatures, and writes each recovered JPEG to a separate file.
@@ -83,19 +106,3 @@ The program generates recovered images with names such as:
 ```
 
 https://cs50.harvard.edu/x/
-
-
-## Python
-
-### Digital Image Processing (CS/ECE 454) Workshop by Prof. Emmanuel Agu
-
-### Description
-Python-matplotlib based digital image processing toolkit, based on : 
-
-- Spatial filtering
-- Edge detection
-- Histogram analysis
-- Intensity windowing
-- Thresholding
-- Pixel-level transformations.
-
