@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Real in-browser image filters, kernels, histogram, pixel inspector and 24-bit BMP export.">
+<title>Image Processing Toolkit demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#dedacd;--card:#d2cdbe;--border:rgba(30,28,18,.18);--text:#1f1e18;--muted:#5e5946;--accent:#8a7250;--on:#1f1e18;--onfg:#dedacd;--bad:#a63d2f;--good:#3f6b45}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#2b2c31;--card:#3c3d44;--border:rgba(255,255,255,.16);--text:#f5f5f0;--muted:#b0aea4;--accent:#c8c0b0;--on:#f5f5f0;--onfg:#2b2c31;--bad:#e07a6a;--good:#8cc796}}
+:root[data-theme="dark"]{--bg:#2b2c31;--card:#3c3d44;--border:rgba(255,255,255,.16);--text:#f5f5f0;--muted:#b0aea4;--accent:#c8c0b0;--on:#f5f5f0;--onfg:#2b2c31;--bad:#e07a6a;--good:#8cc796}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;font-weight:300;line-height:1.5;padding:28px 20px 48px}
+main{max-width:860px;margin:0 auto}
+h1{font-family:"Cormorant Garamond",Georgia,serif;font-weight:400;font-size:clamp(32px,7vw,48px);letter-spacing:-.01em;padding-right:44px}
+.sub{color:var(--muted);margin:6px 0 24px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:13px}
+button,label.btn{font:inherit;font-weight:400;font-size:14px;color:var(--text);background:transparent;border:1px solid var(--border);border-radius:999px;padding:7px 14px;cursor:pointer;transition:border-color .2s,background .2s}
+button:hover,label.btn:hover{border-color:var(--accent)}
+button.sel{background:var(--on);color:var(--onfg);border-color:var(--on)}
+input[type=file]{display:none}
+input[type=range]{flex:1;min-width:140px;accent-color:var(--accent)}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:560px){.pair{grid-template-columns:1fr}}
+.pane .lbl{margin-bottom:6px}
+canvas{display:block;width:100%;height:auto;border:1px solid var(--border);border-radius:8px;background:repeating-conic-gradient(#8884 0 25%,transparent 0 50%) 0 0/12px 12px;cursor:crosshair;image-rendering:auto}
+.info{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted);margin-top:10px;min-height:18px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.sw{display:inline-block;width:12px;height:12px;border:1px solid var(--border);border-radius:3px;vertical-align:-2px;margin-right:4px}
+.kern{display:inline-grid;gap:3px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.kern span{min-width:30px;text-align:center;padding:4px 6px;border:1px solid var(--border);border-radius:5px}
+.kern span.c{border-color:var(--accent)}
+.kwrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.hint{font-size:12px;color:var(--muted)}
+.snip{font-family:ui-monospace,Menlo,monospace;font-size:13px;white-space:pre;overflow-x:auto}
+#hist{height:64px;cursor:default;background:var(--bg)}
+.ok{color:var(--good)}
+</style>
+</head>
+<body>
+<main>
+<h1 style="padding-right:0">Image processing</h1>
+<p class="sub">Real pixel work, running in your browser: pick a filter and it runs a loop over the raw RGB bytes of the image, the same way the C toolkit walks a BMP. Load your own picture or use the generated sample, hover to inspect pixels, and save the result as a real 24-bit <span class="mono">.bmp</span>.</p>
+
+<div class="card">
+<div class="lbl">Image</div>
+<div class="row">
+<label class="btn" for="file">Load image</label><input type="file" id="file" accept="image/*">
+<button id="sample">Sample</button>
+<button id="dl">Download .bmp</button>
+<span class="hint" id="drop">or drop a file anywhere</span>
+</div>
+</div>
+
+<div class="card">
+<div class="lbl">Filter</div>
+<div class="row" id="filters"></div>
+<div class="row" id="prow" style="margin-top:14px" hidden><span class="mono" id="plbl"></span><input type="range" id="p"><span class="mono" id="pval"></span></div>
+<div class="kwrap" id="kwrap"></div>
+</div>
+
+<div class="card">
+<div class="pair">
+<div class="pane"><div class="lbl">Input</div><canvas id="cin"></canvas></div>
+<div class="pane"><div class="lbl">Output</div><canvas id="cout"></canvas></div>
+</div>
+<div class="info" id="px">Hover an image to read pixels.</div>
+<div class="info" id="stat"></div>
+</div>
+
+<div class="card"><div class="lbl">Luminance histogram (outline: input, filled: output)</div><canvas id="hist" width="256" height="64"></canvas></div>
+
+<div class="card"><div class="lbl">C</div><div id="snip" class="snip"></div></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const cl=v=>v<0?0:v>255?255:v+.5|0;
+const ci=$('cin'),co=$('cout'),xi=ci.getContext('2d',{willReadFrequently:true}),xo=co.getContext('2d',{willReadFrequently:true});
+let src=null,out=null,cur='gray';
+const lum=(d,i)=>.299*d[i]+.587*d[i+1]+.114*d[i+2];
+
+/* ---------- kernels & helpers ---------- */
+const SHARP=[0,-1,0,-1,5,-1,0,-1,0],EMB=[-2,-1,0,-1,1,1,0,1,2];
+const GX=[-1,0,1,-2,0,2,-1,0,1],GY=[-1,-2,-1,0,0,0,1,2,1];
+function conv(s,k,n,div,bias){
+  const w=s.width,h=s.height,a=s.data,o=new ImageData(w,h),b=o.data,r=n>>1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    let R=0,G=0,B=0;
+    for(let j=0;j<n;j++){const yy=Math.min(h-1,Math.max(0,y+j-r));
+      for(let i=0;i<n;i++){const xx=Math.min(w-1,Math.max(0,x+i-r)),q=(yy*w+xx)*4,c=k[j*n+i];R+=a[q]*c;G+=a[q+1]*c;B+=a[q+2]*c}}
+    const p=(y*w+x)*4;b[p]=cl(R/div+bias);b[p+1]=cl(G/div+bias);b[p+2]=cl(B/div+bias);b[p+3]=a[p+3];
+  }
+  return o;
+}
+function sep(s,k){ /* separable 1-D kernel, horizontal then vertical */
+  const w=s.width,h=s.height,n=k.length,r=n>>1,sum=k.reduce((a,b)=>a+b,0);
+  let a=s.data,t=new ImageData(w,h),o=new ImageData(w,h);
+  for(let pass=0;pass<2;pass++){
+    const from=pass?t.data:a,to=pass?o.data:t.data;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      let R=0,G=0,B=0;
+      for(let i=0;i<n;i++){
+        const xx=pass?x:Math.min(w-1,Math.max(0,x+i-r)),yy=pass?Math.min(h-1,Math.max(0,y+i-r)):y,q=(yy*w+xx)*4;
+        R+=from[q]*k[i];G+=from[q+1]*k[i];B+=from[q+2]*k[i];
+      }
+      const p=(y*w+x)*4;to[p]=cl(R/sum);to[p+1]=cl(G/sum);to[p+2]=cl(B/sum);to[p+3]=a[p+3];
+    }
+  }
+  return o;
+}
+function map(s,f){const o=new ImageData(s.width,s.height),a=s.data,b=o.data;for(let i=0;i<a.length;i+=4){const r=f(a[i],a[i+1],a[i+2],i);b[i]=r[0];b[i+1]=r[1];b[i+2]=r[2];b[i+3]=a[i+3]}return o}
+
+/* ---------- filters ---------- */
+const F=[
+{id:'gray',name:'Grayscale',c:'for (i = 0; i < w * h; i++) {\n    uint8_t *p = px + i * 3;          /* B, G, R */\n    uint8_t y = 0.299*p[2] + 0.587*p[1] + 0.114*p[0];\n    p[0] = p[1] = p[2] = y;\n}',
+ run:s=>map(s,(r,g,b)=>{const y=cl(.299*r+.587*g+.114*b);return[y,y,y]})},
+{id:'sepia',name:'Sepia',c:'r = 0.393*R + 0.769*G + 0.189*B;\ng = 0.349*R + 0.686*G + 0.168*B;\nb = 0.272*R + 0.534*G + 0.131*B;\np[2] = clamp(r); p[1] = clamp(g); p[0] = clamp(b);',
+ run:s=>map(s,(r,g,b)=>[cl(.393*r+.769*g+.189*b),cl(.349*r+.686*g+.168*b),cl(.272*r+.534*g+.131*b)])},
+{id:'invert',name:'Invert',c:'for (i = 0; i < w * h * 3; i++)\n    px[i] = 255 - px[i];',
+ run:s=>map(s,(r,g,b)=>[255-r,255-g,255-b])},
+{id:'bright',name:'Brightness',p:{l:'delta',min:-100,max:100,v:40},c:p=>'for (i = 0; i < w * h * 3; i++)\n    px[i] = clamp(px[i] + '+p+');',
+ run:(s,p)=>map(s,(r,g,b)=>[cl(r+p),cl(g+p),cl(b+p)])},
+{id:'contrast',name:'Contrast',p:{l:'amount',min:-100,max:100,v:50},c:p=>{const c=p*2.55,f=(259*(c+255))/(255*(259-c));return 'float f = '+f.toFixed(3)+';   /* 259(c+255) / 255(259-c), c = '+c.toFixed(0)+' */\nfor (i = 0; i < w * h * 3; i++)\n    px[i] = clamp(f * (px[i] - 128) + 128);'},
+ run:(s,p)=>{const c=p*2.55,f=(259*(c+255))/(255*(259-c));return map(s,(r,g,b)=>[cl(f*(r-128)+128),cl(f*(g-128)+128),cl(f*(b-128)+128)])}},
+{id:'thresh',name:'Threshold',p:{l:'level',min:0,max:255,v:128},c:p=>'uint8_t y = 0.299*R + 0.587*G + 0.114*B;\np[0] = p[1] = p[2] = (y > '+p+') ? 255 : 0;',
+ run:(s,p)=>map(s,(r,g,b)=>{const y=.299*r+.587*g+.114*b>p?255:0;return[y,y,y]})},
+{id:'blur',name:'Box blur',p:{l:'radius',min:1,max:10,v:3},c:p=>'/* '+(2*p+1)+'-tap box, run along rows then columns */\nfor (x = 0; x < w; x++) {\n    sum = 0;\n    for (k = -'+p+'; k <= '+p+'; k++) sum += in[clampx(x + k)];\n    out[x] = sum / '+(2*p+1)+';\n}',
+ run:(s,p)=>sep(s,new Array(2*p+1).fill(1)),
+ k:p=>({txt:(2*p+1)+' x '+(2*p+1)+' box, every weight = 1/'+(2*p+1)*(2*p+1)})},
+{id:'gauss',name:'Gaussian blur',p:{l:'passes',min:1,max:6,v:1},c:p=>'static const int k[5] = {1, 4, 6, 4, 1};   /* sum = 16 */\nfor (n = 0; n < '+p+'; n++)\n    convolve_h_then_v(img, k, 5, 16);',
+ run:(s,p)=>{let o=s;for(let i=0;i<p;i++)o=sep(o,[1,4,6,4,1]);return o},
+ k:()=>({n:5,m:[1,4,6,4,1].flatMap(a=>[1,4,6,4,1].map(b=>a*b)),div:256})},
+{id:'sharp',name:'Sharpen',c:'static const int k[9] = { 0,-1, 0,\n                         -1, 5,-1,\n                          0,-1, 0 };\nconvolve(img, k, 3, 1);',
+ run:s=>conv(s,SHARP,3,1,0),k:()=>({n:3,m:SHARP,div:1})},
+{id:'emboss',name:'Emboss',c:'static const int k[9] = {-2,-1, 0,\n                         -1, 1, 1,\n                          0, 1, 2 };\nconvolve(img, k, 3, 1, /*bias*/ 128);',
+ run:s=>conv(s,EMB,3,1,128),k:()=>({n:3,m:EMB,div:1})},
+{id:'sobel',name:'Edge (Sobel)',c:'gx = sum(gray[3x3] * Gx);\ngy = sum(gray[3x3] * Gy);\nmag = sqrt(gx*gx + gy*gy);\np[0] = p[1] = p[2] = clamp(mag);',
+ run:s=>{
+   const w=s.width,h=s.height,a=s.data,g=new Float32Array(w*h),o=new ImageData(w,h),b=o.data;
+   for(let i=0;i<w*h;i++)g[i]=lum(a,i*4);
+   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+     let sx=0,sy=0;
+     for(let j=0;j<3;j++)for(let i=0;i<3;i++){const v=g[Math.min(h-1,Math.max(0,y+j-1))*w+Math.min(w-1,Math.max(0,x+i-1))];sx+=v*GX[j*3+i];sy+=v*GY[j*3+i]}
+     const m=cl(Math.hypot(sx,sy)),p=(y*w+x)*4;b[p]=b[p+1]=b[p+2]=m;b[p+3]=255;
+   }
+   return o},
+ k:()=>({n:3,m:GX,div:1,label:'Gx'}),k2:()=>({n:3,m:GY,div:1,label:'Gy'})},
+{id:'eq',name:'Equalize',c:'hist[lum(p)]++;  /* pass 1 */\ncdf[i] = cdf[i-1] + hist[i];\nnew_y = 255 * (cdf[y] - cdf_min) / (w*h - cdf_min);\nscale R, G, B by new_y / y;   /* pass 2 */',
+ run:s=>{
+   const a=s.data,hs=new Array(256).fill(0),n=a.length/4;
+   for(let i=0;i<a.length;i+=4)hs[Math.round(lum(a,i))]++;
+   const cdf=[];let c=0;hs.forEach((v,i)=>{c+=v;cdf[i]=c});
+   const mn=cdf.find(v=>v>0),lut=cdf.map(v=>255*(v-mn)/Math.max(1,n-mn));
+   return map(s,(r,g,b,i)=>{const y=Math.max(1,lum(a,i)),f=lut[Math.round(y)]/y;return[cl(r*f),cl(g*f),cl(b*f)]})}},
+{id:'pix',name:'Pixelate',p:{l:'block',min:2,max:40,v:10},c:p=>'for (by = 0; by < h; by += '+p+')\n  for (bx = 0; bx < w; bx += '+p+') {\n    avg = mean(block '+p+'x'+p+');\n    fill(block, avg);\n  }',
+ run:(s,p)=>{
+   const w=s.width,h=s.height,a=s.data,o=new ImageData(w,h),b=o.data;
+   for(let by=0;by<h;by+=p)for(let bx=0;bx<w;bx+=p){
+     let R=0,G=0,B=0,n=0;const ye=Math.min(h,by+p),xe=Math.min(w,bx+p);
+     for(let y=by;y<ye;y++)for(let x=bx;x<xe;x++){const q=(y*w+x)*4;R+=a[q];G+=a[q+1];B+=a[q+2];n++}
+     R=cl(R/n);G=cl(G/n);B=cl(B/n);
+     for(let y=by;y<ye;y++)for(let x=bx;x<xe;x++){const q=(y*w+x)*4;b[q]=R;b[q+1]=G;b[q+2]=B;b[q+3]=255}
+   }
+   return o}},
+{id:'mirror',name:'Mirror',c:'for (y = 0; y < h; y++)\n    for (x = 0; x < w / 2; x++)\n        swap_pixel(row[y], x, w - 1 - x);',
+ run:s=>{const w=s.width,h=s.height,a=s.data,o=new ImageData(w,h),b=o.data;
+   for(let y=0;y<h;y++)for(let x=0;x<w;x++){const p=(y*w+x)*4,q=(y*w+(w-1-x))*4;b[p]=a[q];b[p+1]=a[q+1];b[p+2]=a[q+2];b[p+3]=a[q+3]}return o}}
+];
+const P={};F.forEach(f=>{if(f.p)P[f.id]=f.p.v});
+
+/* ---------- UI ---------- */
+function kernHtml(k){
+  const c=k.n>>1;
+  return '<div>'+(k.label?'<div class="hint" style="margin-bottom:4px">'+k.label+'</div>':'')+'<div class="kern" style="grid-template-columns:repeat('+k.n+',auto)">'
+    +k.m.map((v,i)=>'<span'+(i===k.n*c+c?' class="c"':'')+'>'+v+'</span>').join('')+'</div></div>'
+    +(k.div>1?'<div class="mono">&times; 1/'+k.div+'</div>':'');
+}
+function drawUI(){
+  const f=F.find(x=>x.id===cur);
+  $('filters').innerHTML=F.map(x=>'<button data-f="'+x.id+'"'+(x.id===cur?' class="sel"':'')+'>'+x.name+'</button>').join('');
+  $('filters').querySelectorAll('button').forEach(b=>b.onclick=()=>{cur=b.dataset.f;drawUI();apply()});
+  $('prow').hidden=!f.p;
+  if(f.p){const r=$('p');r.min=f.p.min;r.max=f.p.max;r.value=P[f.id];$('plbl').textContent=f.p.l;$('pval').textContent=P[f.id]}
+  let kh='';
+  if(f.k){const k=f.k(P[f.id]);kh=k.m?kernHtml(k):'<span class="mono">'+k.txt+'</span>';if(f.k2)kh+=kernHtml(f.k2())}
+  $('kwrap').innerHTML=kh;$('kwrap').hidden=!kh;
+}
+$('p').oninput=e=>{P[cur]=+e.target.value;$('pval').textContent=P[cur];apply()};
+
+function apply(){
+  if(!src)return;
+  const f=F.find(x=>x.id===cur),p=P[cur],t0=performance.now();
+  out=f.run(src,p);
+  const ms=performance.now()-t0;
+  xo.putImageData(out,0,0);
+  $('stat').innerHTML='<span>'+src.width+' &times; '+src.height+'</span><span>'+(src.width*src.height).toLocaleString()+' px</span><span class="ok">'+f.name+': '+ms.toFixed(1)+' ms</span>';
+  $('snip').textContent=typeof f.c==='function'?f.c(p):f.c;
+  hist();
+}
+function hist(){
+  const c=$('hist'),x=c.getContext('2d'),cs=getComputedStyle(document.documentElement);
+  const H=d=>{const h=new Array(256).fill(0);for(let i=0;i<d.length;i+=4)h[Math.round(lum(d,i))]++;return h};
+  const a=H(src.data),b=H(out.data),m=Math.max(...a,...b,1);
+  x.clearRect(0,0,256,64);
+  x.fillStyle=cs.getPropertyValue('--accent').trim()||'#8a7250';x.globalAlpha=.8;
+  b.forEach((v,i)=>{const h=Math.sqrt(v/m)*62;x.fillRect(i,64-h,1,h)});
+  x.globalAlpha=1;x.strokeStyle=cs.getPropertyValue('--text').trim()||'#000';x.globalAlpha=.6;x.beginPath();
+  a.forEach((v,i)=>{const y=64-Math.sqrt(v/m)*62;i?x.lineTo(i+.5,y):x.moveTo(i+.5,y)});x.stroke();x.globalAlpha=1;
+}
+
+/* ---------- loading ---------- */
+function setImage(source,w,h){
+  const s=Math.min(1,560/Math.max(w,h)),W=Math.max(1,Math.round(w*s)),H=Math.max(1,Math.round(h*s));
+  ci.width=co.width=W;ci.height=co.height=H;
+  xi.clearRect(0,0,W,H);xi.drawImage(source,0,0,W,H);
+  src=xi.getImageData(0,0,W,H);apply();
+}
+function sample(){
+  const c=document.createElement('canvas');c.width=480;c.height=320;const x=c.getContext('2d');
+  let g=x.createLinearGradient(0,0,0,320);g.addColorStop(0,'#2a4d8f');g.addColorStop(.6,'#f4b16a');g.addColorStop(1,'#f9dca0');x.fillStyle=g;x.fillRect(0,0,480,320);
+  x.fillStyle='#fff3c2';x.beginPath();x.arc(370,90,36,0,7);x.fill();
+  x.fillStyle='#3d5a3a';x.beginPath();x.moveTo(0,320);x.lineTo(0,210);x.quadraticCurveTo(120,140,250,220);x.quadraticCurveTo(360,270,480,190);x.lineTo(480,320);x.fill();
+  x.fillStyle='#24382a';x.beginPath();x.moveTo(0,320);x.lineTo(0,270);x.quadraticCurveTo(200,220,480,280);x.lineTo(480,320);x.fill();
+  x.fillStyle='#c8553d';x.fillRect(90,200,90,64);x.fillStyle='#7a2e22';x.beginPath();x.moveTo(80,200);x.lineTo(135,158);x.lineTo(190,200);x.fill();
+  x.fillStyle='#f2e6c9';x.fillRect(116,226,20,38);x.fillRect(150,214,16,16);
+  for(let j=0;j<4;j++)for(let i=0;i<6;i++){x.fillStyle=(i+j)%2?'#111':'#eee';x.fillRect(260+i*14,20+j*14,14,14)}
+  x.font='700 30px Georgia,serif';x.fillStyle='#fff';x.fillText('BMP',24,60);
+  const d=x.getImageData(0,0,480,320),a=d.data;let seed=7;
+  for(let i=0;i<a.length;i+=4){seed=(seed*1664525+1013904223)>>>0;const n=((seed>>>24)-128)*.16;a[i]=cl(a[i]+n);a[i+1]=cl(a[i+1]+n);a[i+2]=cl(a[i+2]+n)}
+  x.putImageData(d,0,0);setImage(c,480,320);
+}
+function loadFile(f){
+  if(!f||!/^image\//.test(f.type))return;
+  const u=URL.createObjectURL(f),im=new Image();
+  im.onload=()=>{setImage(im,im.naturalWidth,im.naturalHeight);URL.revokeObjectURL(u)};
+  im.onerror=()=>{$('stat').textContent='Could not decode that file.'};
+  im.src=u;
+}
+$('file').onchange=e=>loadFile(e.target.files[0]);
+$('sample').onclick=sample;
+addEventListener('dragover',e=>e.preventDefault());
+addEventListener('drop',e=>{e.preventDefault();loadFile(e.dataTransfer.files[0])});
+
+/* ---------- pixel inspector ---------- */
+function inspect(e){
+  if(!src)return;
+  const c=e.currentTarget,r=c.getBoundingClientRect();
+  const x=Math.min(src.width-1,Math.max(0,Math.floor((e.clientX-r.left)/r.width*src.width))),y=Math.min(src.height-1,Math.max(0,Math.floor((e.clientY-r.top)/r.height*src.height)));
+  const q=(y*src.width+x)*4,a=src.data,b=out.data;
+  const t=(d,l)=>'<span><i class="sw" style="background:rgb('+d[q]+','+d[q+1]+','+d[q+2]+')"></i>'+l+' ('+d[q]+', '+d[q+1]+', '+d[q+2]+')</span>';
+  $('px').innerHTML='<span>x='+x+' y='+y+'</span>'+t(a,'in')+t(b,'out');
+}
+ci.onpointermove=co.onpointermove=inspect;
+
+/* ---------- BMP export (24-bit, bottom-up, rows padded to 4 bytes) ---------- */
+$('dl').onclick=()=>{
+  if(!out)return;
+  const w=out.width,h=out.height,rs=(w*3+3)&~3,sz=54+rs*h,buf=new ArrayBuffer(sz),v=new DataView(buf),u=new Uint8Array(buf),d=out.data;
+  u[0]=66;u[1]=77;v.setUint32(2,sz,true);v.setUint32(10,54,true);v.setUint32(14,40,true);v.setInt32(18,w,true);v.setInt32(22,h,true);
+  v.setUint16(26,1,true);v.setUint16(28,24,true);v.setUint32(34,rs*h,true);v.setInt32(38,2835,true);v.setInt32(42,2835,true);
+  for(let y=0;y<h;y++){const o=54+(h-1-y)*rs;for(let x=0;x<w;x++){const q=(y*w+x)*4,p=o+x*3;u[p]=d[q+2];u[p+1]=d[q+1];u[p+2]=d[q]}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'image/bmp'}));a.download='output-'+cur+'.bmp';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  $('stat').innerHTML+='<span>saved '+sz.toLocaleString()+' bytes (54 header + '+w+'&times;'+h+' rows of '+rs+' B)</span>';
+};
+
+drawUI();sample();
+</script>
+</body>
+</html>
