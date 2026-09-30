@@ -1,6 +1,10 @@
 # Trixie
 
 A small retro-styled image editor that runs entirely in your browser. One HTML file, no build step, no dependencies, and your images never leave your device.
+## [Website](https://moudzx.github.io/Trixie)
+
+<img width="3072" height="4608" alt="Screenshot 2026-09-30 at 10-19-19 Trixie - retro image lab" src="https://github.com/user-attachments/assets/69521716-91a9-430f-a7d4-5063e817a646" />
+
 
 ## Run it
 
