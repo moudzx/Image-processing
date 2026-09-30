@@ -1,4 +1,78 @@
-# Image-processing
+# Trixie
+
+A small retro-styled image editor that runs entirely in your browser. One HTML file, no build step, no dependencies, and your images never leave your device.
+
+## Run it
+
+Open `index.html` in any modern browser, or host it as a static page anywhere.
+
+The title uses the Press Start 2P font from Google Fonts. Offline, it falls back to a generic monospace font and everything else works as normal.
+
+## Getting an image in
+
+- **Load image** button
+- **Sample**, a generated test picture
+- Drag and drop a file anywhere on the page
+- Paste from the clipboard (Ctrl/Cmd+V)
+
+Large images are scaled down so the longest side is at most 960 px. Edits and exports use that working size.
+
+## Features
+
+### Adjust (live sliders)
+Exposure, Contrast, Saturation, Hue, Warmth, Gamma, Vignette, Grain. These combine with any filter and can be reset in one click.
+
+### Presets
+Vintage, Noir, Cool, Warm, Fade, Vivid, Arcade, Dusk. Each sets the sliders and a filter, and you can keep tweaking afterwards.
+
+### Filters
+None, Grayscale, Sepia, Invert, Brightness, Contrast, Threshold, Box blur, Gaussian blur, Sharpen, Emboss, Edge (Sobel), Equalize, Pixelate, Mirror, Posterize, Palette, Scanlines, RGB glitch, Solarize, Duotone, Unsharp mask, Denoise.
+
+The Palette filter maps the image to a retro palette (Game Boy, CGA, Amber CRT, PICO-8, Vapor) with optional Bayer dithering. Convolution filters show their kernel.
+
+### Edit tools
+- **Stack result** bakes the current filter and adjustments in so you can keep building on it
+- Undo, Redo, Reset to the original
+- **Crop**: drag a rectangle on the input image, then press *Crop selection*
+- Rotate, Flip H, Flip V
+- Resize: 25%, 50%, 75%, 150%, 200%
+- **Auto levels**
+- **Hold: original**: press and hold to compare with the input
+
+### Text and border
+Add a caption (size, color, top/middle/bottom) and a border (width, color).
+
+### Colors
+- Pixel inspector: hover either image to read RGB and hex values
+- **Extract palette**: up to 8 dominant colors, click a swatch to copy its hex code
+- Luminance histogram (line: input, bars: output)
+
+### Save
+| Format | Notes |
+|--------|-------|
+| PNG | Lossless, keeps transparency |
+| JPG | Quality slider, transparency flattened to white |
+| WebP | Quality slider |
+| BMP | 24-bit, transparency flattened to white |
+
+Export scale is 1x, 2x, 4x or 8x using nearest-neighbour, so pixel art stays crisp. **Copy PNG** puts the image on the clipboard (the browser may ask for permission).
+
+## Keyboard shortcuts
+
+| Keys | Action |
+|------|--------|
+| Ctrl/Cmd+Z | Undo |
+| Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z | Redo |
+| Ctrl/Cmd+V | Paste an image |
+
+## Notes
+
+- Filters work directly on raw pixel data in JavaScript (canvas `ImageData`), with no libraries.
+- Denoise is the slowest filter on large images, especially at radius 2.
+- Some browsers cannot encode WebP. If so, Trixie tells you and you can pick another format.
+- The look follows your system light/dark setting. Dark is a muted purple, light is a Game Boy-style green.
+
+# Image-processing workshops associated
 
 Raw image recovery and 24-bit BMP images filter library in C & Python-matplotlib based digital image processing toolkit.
 
