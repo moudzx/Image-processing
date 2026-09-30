@@ -55,6 +55,7 @@ input[type=text]{flex:1;min-width:140px}
 input[type=color]{width:36px;height:32px;border:2px solid var(--border);background:var(--bg);padding:0;cursor:pointer}
 #pal button{display:flex;gap:6px;align-items:center}
 #pal i{width:14px;height:14px;border:2px solid var(--text)}
+[hidden]{display:none!important}
 #hist{height:64px;cursor:default;background:var(--bg)}
 .ok{color:var(--cy)}
 #swatches{display:flex;gap:3px}
@@ -90,6 +91,7 @@ input[type=color]{width:36px;height:32px;border:2px solid var(--border);backgrou
 <div class="lbl">Filter</div>
 <div class="row" id="filters"></div>
 <div class="row" id="prow" style="margin-top:14px" hidden><span class="mono" id="plbl"></span><input type="range" id="p" aria-label="Filter amount"><span class="mono" id="pval"></span><span id="swatches"></span></div>
+<div class="row" id="strow" style="margin-top:14px" hidden><span class="mono">strength</span><input type="range" id="st" min="0" max="100" value="100" aria-label="Filter strength"><span class="mono" id="stv">100</span></div>
 <div class="row" id="drow" style="margin-top:14px" hidden><label class="chk"><input type="checkbox" id="dth" checked> Dither</label></div>
 <div class="kwrap" id="kwrap"></div>
 </div>
@@ -109,6 +111,8 @@ input[type=color]{width:36px;height:32px;border:2px solid var(--border);backgrou
 <button id="fv">Flip V</button>
 <select id="rs" aria-label="Resize"><option value="">Resize</option><option value="0.25">25%</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1.5">150%</option><option value="2">200%</option></select>
 </div>
+<div class="row" style="margin-top:12px"><select id="tool" aria-label="Output tool"><option value="inspect">Tool: Inspect</option><option value="split">Tool: Compare slider</option><option value="pen">Tool: Pencil</option></select>
+<span class="row" id="penrow" hidden><input type="color" id="pc" value="#e0c987" aria-label="Pencil color"><input type="number" id="ps" value="4" min="1" max="40" style="width:68px" aria-label="Pencil size"></span></div>
 <div class="info" id="hstat"></div>
 </div>
 
@@ -263,6 +267,23 @@ const F=[
    for(let y=0;y<h;y++)for(let x=0;x<w;x++){const q=(y*w+x)*4,v=[[],[],[]];
      for(let j=-p;j<=p;j++)for(let i=-p;i<=p;i++){const t=(Math.min(h-1,Math.max(0,y+j))*w+Math.min(w-1,Math.max(0,x+i)))*4;v[0].push(a[t]);v[1].push(a[t+1]);v[2].push(a[t+2])}
      for(let k=0;k<3;k++)b[q+k]=v[k].sort((m,z)=>m-z)[n];b[q+3]=a[q+3]}
+   return o}},
+{id:'bloom',name:'Bloom',p:{l:'amount',min:1,max:10,v:4},
+ run:(s,p)=>{const br=sep(map(s,(r,g,b)=>.299*r+.587*g+.114*b>170?[r,g,b]:[0,0,0]),new Array(13).fill(1)),a=s.data,c=br.data,o=new ImageData(s.width,s.height),b=o.data;
+   for(let i=0;i<a.length;i+=4){for(let k=0;k<3;k++)b[i+k]=cl(a[i+k]+c[i+k]*p*.25);b[i+3]=a[i+3]}return o}},
+{id:'half',name:'Halftone',p:{l:'cell',min:4,max:16,v:8},
+ run:(s,p)=>{const w=s.width,h=s.height,a=s.data,o=new ImageData(w,h),b=o.data;b.fill(255);
+   for(let by=0;by<h;by+=p)for(let bx=0;bx<w;bx+=p){let L=0,n=0;const ye=Math.min(h,by+p),xe=Math.min(w,bx+p);
+     for(let y=by;y<ye;y++)for(let x=bx;x<xe;x++){L+=lum(a,(y*w+x)*4);n++}
+     const rad=Math.sqrt(1-L/n/255)*p*.72,cx=bx+p/2,cy=by+p/2;
+     for(let y=by;y<ye;y++)for(let x=bx;x<xe;x++)if((x+.5-cx)**2+(y+.5-cy)**2<=rad*rad){const q=(y*w+x)*4;b[q]=b[q+1]=b[q+2]=20}}
+   return o}},
+{id:'psort',name:'Pixel sort',p:{l:'threshold',min:20,max:240,v:110},
+ run:(s,p)=>{const w=s.width,h=s.height,a=s.data,o=new ImageData(new Uint8ClampedArray(a),w,h),b=o.data,L=q=>.299*a[q]+.587*a[q+1]+.114*a[q+2];
+   for(let y=0;y<h;y++){let x=0;while(x<w){while(x<w&&L((y*w+x)*4)<p)x++;let e=x;while(e<w&&L((y*w+e)*4)>=p)e++;
+     if(e-x>1){const seg=[];for(let i=x;i<e;i++){const q=(y*w+i)*4;seg.push([a[q],a[q+1],a[q+2],a[q+3],L(q)])}
+       seg.sort((m,z)=>m[4]-z[4]);seg.forEach((c,i)=>{const q=(y*w+x+i)*4;b[q]=c[0];b[q+1]=c[1];b[q+2]=c[2];b[q+3]=c[3]})}
+     x=Math.max(e,x+1)}}
    return o}}
 ];
 const P={};F.forEach(f=>{if(f.p)P[f.id]=f.p.v});
@@ -280,7 +301,7 @@ function drawUI(){
   $('filters').querySelectorAll('button').forEach(b=>b.onclick=()=>{cur=b.dataset.f;drawUI();apply()});
   $('prow').hidden=!f.p;
   if(f.p){const r=$('p');r.min=f.p.min;r.max=f.p.max;r.value=P[f.id];$('plbl').textContent=f.p.l;$('pval').textContent=f.p.names?f.p.names[P[f.id]]:P[f.id];$('swatches').innerHTML=f.p.names?PALS[P[f.id]].rgb.map(c=>'<i style="background:rgb('+c+')"></i>').join(''):''}
-  $('drow').hidden=!f.dith;
+  $('drow').hidden=!f.dith;$('strow').hidden=cur==='none';
   let kh='';
   if(f.k){const k=f.k(P[f.id]);kh=k.m?kernHtml(k):'<span class="mono">'+k.txt+'</span>';if(f.k2)kh+=kernHtml(f.k2())}
   $('kwrap').innerHTML=kh;$('kwrap').hidden=!kh;
@@ -291,9 +312,9 @@ $('dth').onchange=()=>apply();;
 function apply(){
   if(!src)return;
   const f=F.find(x=>x.id===cur),p=P[cur],t0=performance.now();
-  out=f.run(adj(src),p);
+  const base=adj(src);out=f.run(base,p);if(ST<100&&out!==base)out=mix(base,out,ST/100);
   const ms=performance.now()-t0;
-  xo.putImageData(out,0,0);
+  paintOut();
   $('stat').innerHTML='<span>'+src.width+' &times; '+src.height+'</span><span>'+(src.width*src.height).toLocaleString()+' px</span><span class="ok">'+f.name+': '+ms.toFixed(1)+' ms</span>';
   hist();
 }
@@ -415,7 +436,7 @@ $('pre').innerHTML=Object.keys(PRE).map(k=>'<button data-k="'+k+'">'+k+'</button
 $('pre').onclick=e=>{const k=e.target.dataset.k;if(!k)return;const{f,...v}=PRE[k];resetAdj(false);Object.assign(A,v);
   $('adjg').querySelectorAll('input').forEach(i=>{i.value=A[i.dataset.a];i.nextElementSibling.textContent=i.value});
   cur=f||'none';drawUI();apply()};
-const showIn=()=>{if(src)xo.putImageData(src,0,0)},showOut=()=>{if(out)xo.putImageData(out,0,0)};
+const showIn=()=>{if(src)xo.putImageData(src,0,0)},showOut=()=>{if(out)paintOut()};
 $('cmp').onpointerdown=showIn;['pointerup','pointerleave','pointercancel'].forEach(e=>$('cmp').addEventListener(e,showOut));
 addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){e.preventDefault();$('redo').click()}});
 function layer(draw){const w=out.width,h=out.height,c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.putImageData(out,0,0);draw(x,w,h);bake(x.getImageData(0,0,w,h))}
@@ -437,6 +458,25 @@ $('xp').onclick=()=>{if(!out)return;const d=out.data,m=new Map();
   $('pal').innerHTML=cs.map(c=>{const h=hx(c,0);return'<button data-h="'+h+'"><i style="background:'+h+'"></i>'+h+'</button>'}).join('')};
 $('pal').onclick=async e=>{const b=e.target.closest('button');if(!b)return;
   try{await navigator.clipboard.writeText(b.dataset.h);$('stat').innerHTML+='<span class="ok">copied '+b.dataset.h+'</span>'}catch(_){$('stat').innerHTML+='<span>'+b.dataset.h+'</span>'}};
+
+/* ---------- strength, compare slider, pencil ---------- */
+let ST=100,tool='inspect',split=.5,pdown=false,last=null,raf2=0;
+function mix(a,b,t){const o=new ImageData(a.width,a.height),x=a.data,y=b.data,z=o.data;for(let i=0;i<x.length;i++)z[i]=i%4==3?x[i]:x[i]+(y[i]-x[i])*t;return o}
+$('st').oninput=e=>{ST=+e.target.value;$('stv').textContent=ST;cancelAnimationFrame(raf);raf=requestAnimationFrame(apply)};
+function paintOut(){xo.putImageData(out,0,0);if(tool==='split'&&src){const x=Math.round(split*out.width);xo.putImageData(src,0,0,0,0,x,out.height);xo.fillStyle='#fff';xo.fillRect(x-1,0,2,out.height)}}
+const pos=(e,c)=>{const r=c.getBoundingClientRect();return[(e.clientX-r.left)/r.width*c.width,(e.clientY-r.top)/r.height*c.height]};
+$('tool').onchange=()=>{tool=$('tool').value;$('penrow').hidden=tool!=='pen';co.style.touchAction=tool==='inspect'?'auto':'none';if(out)paintOut()};
+function stamp(px,py,rgb){const r=Math.max(.5,+$('ps').value/2),w=src.width,h=src.height,d=src.data;
+  for(let y=Math.max(0,Math.floor(py-r));y<=Math.min(h-1,Math.ceil(py+r));y++)for(let x=Math.max(0,Math.floor(px-r));x<=Math.min(w-1,Math.ceil(px+r));x++)
+    if((x+.5-px)**2+(y+.5-py)**2<=r*r){const q=(y*w+x)*4;d[q]=rgb[0];d[q+1]=rgb[1];d[q+2]=rgb[2];d[q+3]=255}}
+function dot(e){const[x,y]=pos(e,co),c=$('pc').value,rgb=[1,3,5].map(i=>parseInt(c.substr(i,2),16));
+  if(last){const n=Math.ceil(Math.hypot(x-last[0],y-last[1])),k=Math.max(1,n);for(let i=1;i<=k;i++)stamp(last[0]+(x-last[0])*i/k,last[1]+(y-last[1])*i/k,rgb)}else stamp(x,y,rgb);
+  last=[x,y];cancelAnimationFrame(raf2);raf2=requestAnimationFrame(()=>{xi.putImageData(src,0,0);apply()})}
+function moveSplit(e){split=Math.min(1,Math.max(0,pos(e,co)[0]/co.width));paintOut()}
+co.onpointerdown=e=>{if(!src||tool==='inspect')return;co.setPointerCapture(e.pointerId);pdown=true;
+  if(tool==='pen'){hstack.push(src);rstack=[];src=new ImageData(new Uint8ClampedArray(src.data),src.width,src.height);upd();last=null;dot(e)}else moveSplit(e)};
+co.onpointermove=e=>{inspect(e);if(pdown)tool==='pen'?dot(e):moveSplit(e)};
+co.onpointerup=co.onpointercancel=()=>{pdown=false;last=null};
 
 /* ---------- export: PNG / JPG / WebP / BMP ---------- */
 function bmpBlob(d){
