@@ -1,9 +1,8 @@
 # Trixie
 
 A small retro-styled image editor that runs entirely in your browser. One HTML file, no build step, no dependencies, and your images never leave your device.
-## [Website](https://moudzx.github.io/Trixie)
 
-<img width="3072" height="4608" alt="Screenshot 2026-09-30 at 10-19-19 Trixie - retro image lab" src="https://github.com/user-attachments/assets/69521716-91a9-430f-a7d4-5063e817a646" />
+<img width="3072" height="5606" alt="Screenshot 2026-09-30 at 10-57-32 Trixie - retro image lab" src="https://github.com/user-attachments/assets/0ffe3cc5-df38-413a-aa62-a84eb4a59a56" />
 
 
 ## Run it
@@ -30,7 +29,9 @@ Exposure, Contrast, Saturation, Hue, Warmth, Gamma, Vignette, Grain. These combi
 Vintage, Noir, Cool, Warm, Fade, Vivid, Arcade, Dusk. Each sets the sliders and a filter, and you can keep tweaking afterwards.
 
 ### Filters
-None, Grayscale, Sepia, Invert, Brightness, Contrast, Threshold, Box blur, Gaussian blur, Sharpen, Emboss, Edge (Sobel), Equalize, Pixelate, Mirror, Posterize, Palette, Scanlines, RGB glitch, Solarize, Duotone, Unsharp mask, Denoise.
+None, Grayscale, Sepia, Invert, Brightness, Contrast, Threshold, Box blur, Gaussian blur, Sharpen, Emboss, Edge (Sobel), Equalize, Pixelate, Mirror, Posterize, Palette, Scanlines, RGB glitch, Solarize, Duotone, Unsharp mask, Denoise, Bloom, Halftone, Pixel sort.
+
+Select as many filters as you like. They run in the order you picked them, and each one gets its own slider and a **strength** control that blends its result with the previous step. You can move filters up or down in the list, or remove them. Presets such as Arcade and Dusk use more than one filter.
 
 The Palette filter maps the image to a retro palette (Game Boy, CGA, Amber CRT, PICO-8, Vapor) with optional Bayer dithering. Convolution filters show their kernel.
 
@@ -42,6 +43,9 @@ The Palette filter maps the image to a retro palette (Game Boy, CGA, Amber CRT, 
 - Resize: 25%, 50%, 75%, 150%, 200%
 - **Auto levels**
 - **Hold: original**: press and hold to compare with the input
+- **Tool: Compare slider**: drag across the output to split it between before and after
+- **Tool: Pencil**: draw on the image with a chosen color and size, with undo support
+- Tool: Inspect is the default and shows pixel values on hover
 
 ### Text and border
 Add a caption (size, color, top/middle/bottom) and a border (width, color).
@@ -75,7 +79,6 @@ Export scale is 1x, 2x, 4x or 8x using nearest-neighbour, so pixel art stays cri
 - Denoise is the slowest filter on large images, especially at radius 2.
 - Some browsers cannot encode WebP. If so, Trixie tells you and you can pick another format.
 - The look follows your system light/dark setting. Dark is a muted purple, light is a Game Boy-style green.
-
 # Image-processing workshops associated
 
 Raw image recovery and 24-bit BMP images filter library in C & Python-matplotlib based digital image processing toolkit.
