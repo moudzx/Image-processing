@@ -56,6 +56,11 @@ input[type=color]{width:36px;height:32px;border:2px solid var(--border);backgrou
 #pal button{display:flex;gap:6px;align-items:center}
 #pal i{width:14px;height:14px;border:2px solid var(--text)}
 [hidden]{display:none!important}
+.crow{border:2px solid var(--border);padding:10px 12px;margin-top:10px;display:grid;gap:8px}
+.chead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.crow button{padding:4px 9px}
+.sws{display:flex;gap:3px}
+.sws i{width:14px;height:14px;border:2px solid var(--text)}
 #hist{height:64px;cursor:default;background:var(--bg)}
 .ok{color:var(--cy)}
 #swatches{display:flex;gap:3px}
@@ -88,11 +93,9 @@ input[type=color]{width:36px;height:32px;border:2px solid var(--border);backgrou
 </div>
 
 <div class="card">
-<div class="lbl">Filter</div>
+<div class="lbl">Filters (pick several, they run in order)</div>
 <div class="row" id="filters"></div>
-<div class="row" id="prow" style="margin-top:14px" hidden><span class="mono" id="plbl"></span><input type="range" id="p" aria-label="Filter amount"><span class="mono" id="pval"></span><span id="swatches"></span></div>
-<div class="row" id="strow" style="margin-top:14px" hidden><span class="mono">strength</span><input type="range" id="st" min="0" max="100" value="100" aria-label="Filter strength"><span class="mono" id="stv">100</span></div>
-<div class="row" id="drow" style="margin-top:14px" hidden><label class="chk"><input type="checkbox" id="dth" checked> Dither</label></div>
+<div id="chain"></div>
 <div class="kwrap" id="kwrap"></div>
 </div>
 
@@ -140,7 +143,7 @@ input[type=color]{width:36px;height:32px;border:2px solid var(--border);backgrou
 const $=id=>document.getElementById(id);
 const cl=v=>v<0?0:v>255?255:v+.5|0;
 const ci=$('cin'),co=$('cout'),xi=ci.getContext('2d',{willReadFrequently:true}),xo=co.getContext('2d',{willReadFrequently:true});
-let src=null,out=null,cur='none';
+let src=null,out=null,chain=[];
 const lum=(d,i)=>.299*d[i]+.587*d[i+1]+.114*d[i+2];
 
 /* ---------- kernels & helpers ---------- */
@@ -242,7 +245,7 @@ const F=[
  run:(s,p)=>{const st=255/(p-1),q=v=>cl(Math.round(v/st)*st);return map(s,(r,g,b)=>[q(r),q(g),q(b)])}},
 {id:'pal',name:'Palette',p:{l:'palette',min:0,max:PALS.length-1,v:0,names:PALS.map(x=>x.n)},dith:true,
  run:(s,p)=>{
-   const pal=PALS[p].rgb,w=s.width,dt=$('dth').checked;
+   const pal=PALS[p].rgb,w=s.width,dt=DITH;
    return map(s,(r,g,b,i)=>{
      const q=i>>2,t=dt?(BAY[(((q/w)|0)&3)*4+(q%w&3)]/16-.5)*64:0;
      r+=t;g+=t;b+=t;let best=0,bd=1e9;
@@ -287,6 +290,7 @@ const F=[
    return o}}
 ];
 const P={};F.forEach(f=>{if(f.p)P[f.id]=f.p.v});
+const S={};F.forEach(f=>S[f.id]=100);let DITH=true;
 
 /* ---------- UI ---------- */
 function kernHtml(k){
@@ -295,27 +299,43 @@ function kernHtml(k){
     +k.m.map((v,i)=>'<span'+(i===k.n*c+c?' class="c"':'')+'>'+v+'</span>').join('')+'</div></div>'
     +(k.div>1?'<div class="mono">&times; 1/'+k.div+'</div>':'');
 }
-function drawUI(){
-  const f=F.find(x=>x.id===cur);
-  $('filters').innerHTML=F.map(x=>'<button data-f="'+x.id+'"'+(x.id===cur?' class="sel"':'')+'>'+x.name+'</button>').join('');
-  $('filters').querySelectorAll('button').forEach(b=>b.onclick=()=>{cur=b.dataset.f;drawUI();apply()});
-  $('prow').hidden=!f.p;
-  if(f.p){const r=$('p');r.min=f.p.min;r.max=f.p.max;r.value=P[f.id];$('plbl').textContent=f.p.l;$('pval').textContent=f.p.names?f.p.names[P[f.id]]:P[f.id];$('swatches').innerHTML=f.p.names?PALS[P[f.id]].rgb.map(c=>'<i style="background:rgb('+c+')"></i>').join(''):''}
-  $('drow').hidden=!f.dith;$('strow').hidden=cur==='none';
-  let kh='';
-  if(f.k){const k=f.k(P[f.id]);kh=k.m?kernHtml(k):'<span class="mono">'+k.txt+'</span>';if(f.k2)kh+=kernHtml(f.k2())}
+const pvTxt=f=>f.p.names?f.p.names[P[f.id]]:P[f.id],
+  swTxt=f=>f.p.names?PALS[P[f.id]].rgb.map(c=>'<i style="background:rgb('+c+')"></i>').join(''):'';
+function kern(){
+  let kh='';const id=[...chain].reverse().find(i=>F.find(x=>x.id===i).k);
+  if(id){const f=F.find(x=>x.id===id),k=f.k(P[id]);kh=k.m?kernHtml(k):'<span class="mono">'+k.txt+'</span>';if(f.k2)kh+=kernHtml(f.k2())}
   $('kwrap').innerHTML=kh;$('kwrap').hidden=!kh;
 }
-$('p').oninput=e=>{P[cur]=+e.target.value;const f=F.find(x=>x.id===cur);$('pval').textContent=f.p.names?f.p.names[P[cur]]:P[cur];if(f.p.names)$('swatches').innerHTML=PALS[P[cur]].rgb.map(c=>'<i style="background:rgb('+c+')"></i>').join('');apply()}
-$('dth').onchange=()=>apply();;
+function drawUI(){
+  $('filters').innerHTML=F.map(x=>{const i=chain.indexOf(x.id),on=x.id==='none'?!chain.length:i>=0;
+    return '<button data-f="'+x.id+'"'+(on?' class="sel"':'')+'>'+(i>=0?(i+1)+'. ':'')+x.name+'</button>'}).join('');
+  $('filters').querySelectorAll('button').forEach(b=>b.onclick=()=>{const id=b.dataset.f;
+    if(id==='none')chain=[];else{const i=chain.indexOf(id);i>=0?chain.splice(i,1):chain.push(id)}drawUI();apply()});
+  $('chain').innerHTML=chain.map((id,i)=>{const f=F.find(x=>x.id===id);
+    return '<div class="crow" data-id="'+id+'"><div class="chead"><b>'+(i+1)+'. '+f.name+'</b><span class="row"><button data-a="up"'+(i?'':' disabled')+' aria-label="Move up">&uarr;</button><button data-a="dn"'+(i<chain.length-1?'':' disabled')+' aria-label="Move down">&darr;</button><button data-a="rm" aria-label="Remove">&times;</button></span></div>'
+    +(f.p?'<div class="row"><span class="mono">'+f.p.l+'</span><input type="range" data-k="p" min="'+f.p.min+'" max="'+f.p.max+'" value="'+P[id]+'" aria-label="'+f.p.l+'"><span class="mono pv">'+pvTxt(f)+'</span><span class="sws">'+swTxt(f)+'</span></div>':'')
+    +(f.dith?'<label class="chk"><input type="checkbox" data-k="d"'+(DITH?' checked':'')+'> Dither</label>':'')
+    +'<div class="row"><span class="mono">strength</span><input type="range" data-k="s" min="0" max="100" value="'+S[id]+'" aria-label="Strength"><span class="mono sv">'+S[id]+'</span></div></div>'}).join('');
+  kern();
+}
+let rafC=0;
+$('chain').oninput=e=>{const t=e.target,row=t.closest('.crow'),k=t.dataset.k;if(!row||!k)return;const id=row.dataset.id,f=F.find(x=>x.id===id);
+  if(k==='p'){P[id]=+t.value;row.querySelector('.pv').textContent=pvTxt(f);const w=row.querySelector('.sws');if(w)w.innerHTML=swTxt(f)}
+  else if(k==='s'){S[id]=+t.value;row.querySelector('.sv').textContent=t.value}
+  else DITH=t.checked;
+  cancelAnimationFrame(rafC);rafC=requestAnimationFrame(()=>{apply();kern()})};
+$('chain').onclick=e=>{const b=e.target.closest('button');if(!b)return;const id=b.closest('.crow').dataset.id,i=chain.indexOf(id),a=b.dataset.a;
+  if(a==='rm')chain.splice(i,1);else{const j=a==='up'?i-1:i+1;[chain[i],chain[j]]=[chain[j],chain[i]]}drawUI();apply()};
 
 function apply(){
   if(!src)return;
-  const f=F.find(x=>x.id===cur),p=P[cur],t0=performance.now();
-  const base=adj(src);out=f.run(base,p);if(ST<100&&out!==base)out=mix(base,out,ST/100);
+  const t0=performance.now();
+  let o=adj(src);
+  for(const id of chain){const r=F.find(x=>x.id===id).run(o,P[id]);o=S[id]<100?mix(o,r,S[id]/100):r}
+  out=o;
   const ms=performance.now()-t0;
   paintOut();
-  $('stat').innerHTML='<span>'+src.width+' &times; '+src.height+'</span><span>'+(src.width*src.height).toLocaleString()+' px</span><span class="ok">'+f.name+': '+ms.toFixed(1)+' ms</span>';
+  $('stat').innerHTML='<span>'+src.width+' &times; '+src.height+'</span><span>'+(src.width*src.height).toLocaleString()+' px</span><span class="ok">'+(chain.length?chain.map(id=>F.find(x=>x.id===id).name).join(' &rarr; '):'no filter')+': '+ms.toFixed(1)+' ms</span>';
   hist();
 }
 function hist(){
@@ -430,12 +450,12 @@ $('rs').onchange=e=>{const k=+e.target.value;e.target.value='';if(!k||!src)retur
 
 /* ---------- presets, compare, bake, text, border, auto levels, palette ---------- */
 const hx=(d,q)=>'#'+[0,1,2].map(k=>d[q+k].toString(16).padStart(2,'0')).join('');
-function bake(d){push(d);resetAdj(false);cur='none';drawUI();apply()}
-const PRE={Vintage:{sat:-25,temp:30,con:-10,vig:40,grain:30},Noir:{con:40,vig:50,grain:20,f:'gray'},Cool:{temp:-45,sat:10},Warm:{temp:45,exp:8},Fade:{con:-30,exp:12,sat:-30},Vivid:{sat:50,con:20},Arcade:{sat:30,con:20,f:'pal'},Dusk:{f:'duo',vig:30}};
+function bake(d){push(d);resetAdj(false);chain=[];drawUI();apply()}
+const PRE={Vintage:{sat:-25,temp:30,con:-10,vig:40,grain:30},Noir:{con:40,vig:50,grain:20,f:'gray'},Cool:{temp:-45,sat:10},Warm:{temp:45,exp:8},Fade:{con:-30,exp:12,sat:-30},Vivid:{sat:50,con:20},Arcade:{sat:30,con:20,f:['pal','scan']},Dusk:{f:['duo','bloom'],vig:30}};
 $('pre').innerHTML=Object.keys(PRE).map(k=>'<button data-k="'+k+'">'+k+'</button>').join('');
 $('pre').onclick=e=>{const k=e.target.dataset.k;if(!k)return;const{f,...v}=PRE[k];resetAdj(false);Object.assign(A,v);
   $('adjg').querySelectorAll('input').forEach(i=>{i.value=A[i.dataset.a];i.nextElementSibling.textContent=i.value});
-  cur=f||'none';drawUI();apply()};
+  chain=[].concat(f||[]);drawUI();apply()};
 const showIn=()=>{if(src)xo.putImageData(src,0,0)},showOut=()=>{if(out)paintOut()};
 $('cmp').onpointerdown=showIn;['pointerup','pointerleave','pointercancel'].forEach(e=>$('cmp').addEventListener(e,showOut));
 addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){e.preventDefault();$('redo').click()}});
@@ -460,9 +480,8 @@ $('pal').onclick=async e=>{const b=e.target.closest('button');if(!b)return;
   try{await navigator.clipboard.writeText(b.dataset.h);$('stat').innerHTML+='<span class="ok">copied '+b.dataset.h+'</span>'}catch(_){$('stat').innerHTML+='<span>'+b.dataset.h+'</span>'}};
 
 /* ---------- strength, compare slider, pencil ---------- */
-let ST=100,tool='inspect',split=.5,pdown=false,last=null,raf2=0;
+let tool='inspect',split=.5,pdown=false,last=null,raf2=0;
 function mix(a,b,t){const o=new ImageData(a.width,a.height),x=a.data,y=b.data,z=o.data;for(let i=0;i<x.length;i++)z[i]=i%4==3?x[i]:x[i]+(y[i]-x[i])*t;return o}
-$('st').oninput=e=>{ST=+e.target.value;$('stv').textContent=ST;cancelAnimationFrame(raf);raf=requestAnimationFrame(apply)};
 function paintOut(){xo.putImageData(out,0,0);if(tool==='split'&&src){const x=Math.round(split*out.width);xo.putImageData(src,0,0,0,0,x,out.height);xo.fillStyle='#fff';xo.fillRect(x-1,0,2,out.height)}}
 const pos=(e,c)=>{const r=c.getBoundingClientRect();return[(e.clientX-r.left)/r.width*c.width,(e.clientY-r.top)/r.height*c.height]};
 $('tool').onchange=()=>{tool=$('tool').value;$('penrow').hidden=tool!=='pen';co.style.touchAction=tool==='inspect'?'auto':'none';if(out)paintOut()};
@@ -504,7 +523,7 @@ $('dl').onclick=async()=>{
   const fmt=$('fmt').value,b=await getBlob(fmt);
   if(!b){$('stat').textContent='This browser cannot encode '+fmt+'.';return}
   const ext=fmt==='jpeg'?'jpg':fmt,a=document.createElement('a');
-  a.href=URL.createObjectURL(b);a.download='trixie-'+cur+'.'+ext;
+  a.href=URL.createObjectURL(b);a.download='trixie-'+(chain.join('-')||'edit')+'.'+ext;
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   $('stat').innerHTML+='<span>saved .'+ext+' ('+b.size.toLocaleString()+' bytes)</span>';
 };
